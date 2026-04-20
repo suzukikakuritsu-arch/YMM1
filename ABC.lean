@@ -1,3 +1,184 @@
+import Mathlib.Data.Real.Sqrt
+import Mathlib.Analysis.SpecialFunctions.Log.Basic
+import Mathlib.Tactic
+import Mathlib.Algebra.BigOperators.Basic
+
+noncomputable section
+open Real
+
+/-
+============================================================
+PART 1: 黄金比
+============================================================
+-/
+
+def φ : ℝ := (1 + sqrt 5) / 2
+
+lemma φ_pos : 0 < φ := by
+  unfold φ
+  positivity
+
+lemma φ_ne_one : φ ≠ 1 := by
+  unfold φ
+  have : sqrt 5 ≠ 1 := by
+    have : (sqrt 5)^2 ≠ 1 := by norm_num
+    intro h
+    apply this
+    simpa [h]
+  linarith
+
+/-
+============================================================
+PART 2: 指数成長 → 対数線形化
+============================================================
+-/
+
+/-
+基本原理：
+a^n の成長率 → log a
+-/
+
+lemma log_pow_growth (a : ℝ) (ha : 0 < a) :
+  ∀ n : ℕ, log (a^n) = (n : ℝ) * log a := by
+  intro n
+  simpa using log_pow ha n
+
+/-
+============================================================
+PART 3: ノルム成長からエネルギー定義
+============================================================
+-/
+
+/-
+エネルギー（スペクトルレート）の定義
+-/
+
+def energy_rate (f : ℕ → ℝ) : ℝ :=
+  liminf atTop (fun n => log (f n) / n)
+
+/-
+============================================================
+PART 4: φ成長 ⇒ エネルギー ≥ log φ
+============================================================
+-/
+
+/-
+仮定：
+f(n) = C * φ^n 型の下界
+-/
+
+lemma growth_to_energy_lower
+  (C : ℝ)
+  (hC : 0 < C) :
+  energy_rate (fun n => C * φ^n) ≥ log φ :=
+by
+  unfold energy_rate
+  -- liminf の評価
+  have hposφ : 0 < φ := φ_pos
+
+  -- log(C φ^n) = log C + n log φ
+  have hlog :
+    ∀ n : ℕ,
+      log (C * φ^n) = log C + (n : ℝ) * log φ := by
+    intro n
+    have hφn : 0 < φ^n := pow_pos hposφ _
+    have hCφ : 0 < C * φ^n := mul_pos hC hφn
+    have := log_mul hCφ.ne' hCφ.ne'
+    -- 簡略化のため直接展開
+    have : log (C * φ^n) = log C + log (φ^n) :=
+      log_mul (ne_of_gt hC) (ne_of_gt hφn)
+    simp [this, log_pow hposφ]
+
+  -- 極限評価
+  have hlim :
+    Tendsto
+      (fun n : ℕ => (log (C * φ^n)) / n)
+      atTop
+      (𝓝 (log φ)) := by
+    have :
+      (fun n : ℕ => (log C + (n : ℝ) * log φ) / n)
+      = fun n => (log C)/n + log φ := by
+      funext n
+      field_simp
+    simp [hlog, this]
+    have h1 :
+      Tendsto (fun n : ℕ => (log C) / n) atTop (𝓝 0) :=
+      tendsto_const_nhds.div_atTop
+    have h2 :
+      Tendsto (fun _ : ℕ => log φ) atTop (𝓝 (log φ)) :=
+      tendsto_const_nhds
+    have := Tendsto.add h1 h2
+    simpa using this
+
+  -- liminf ≥ limit
+  have :
+    liminf atTop (fun n => log (C * φ^n) / n)
+      = log φ :=
+    tendsto_nhds_unique hlim
+
+  simpa [this]
+
+/-
+============================================================
+PART 5: 一般形（下界だけでOK）
+============================================================
+-/
+
+/-
+f(n) ≥ C φ^n ⇒ energy ≥ log φ
+-/
+
+theorem general_gap_from_growth
+  (f : ℕ → ℝ)
+  (C : ℝ)
+  (hC : 0 < C)
+  (hpos : ∀ n, 0 < f n)
+  (hbound : ∀ n, f n ≥ C * φ^n) :
+  energy_rate f ≥ log φ :=
+by
+  unfold energy_rate
+
+  have hineq :
+    ∀ n, log (f n) / n ≥ log (C * φ^n) / n := by
+    intro n
+    have h1 : log (f n) ≥ log (C * φ^n) :=
+      log_le_log (hpos n) (hbound n)
+    have hn : (0 : ℝ) < n := by
+      cases n <;> norm_num
+    exact div_le_div_of_le_of_nonneg h1 (by positivity)
+
+  have hlim :=
+    growth_to_energy_lower C hC
+
+  exact le_trans
+    (le_of_eq (by simp))
+    hlim
+
+/-
+============================================================
+FINAL THEOREM
+============================================================
+-/
+
+/-
+「φ成長 ⇒ エネルギーギャップ ≥ log φ」
+-/
+
+theorem phi_gap_energy_principle
+  (f : ℕ → ℝ)
+  (C : ℝ)
+  (hC : 0 < C)
+  (hpos : ∀ n, 0 < f n)
+  (hbound : ∀ n, f n ≥ C * φ^n) :
+  energy_rate f ≥ log φ :=
+by
+  exact general_gap_from_growth f C hC hpos hbound
+
+/-
+============================================================
+END
+============================================================
+-/
 import Mathlib.Data.Matrix.Basic
 import Mathlib.Data.Matrix.Notation
 import Mathlib.Data.Real.Sqrt
