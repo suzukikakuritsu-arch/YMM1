@@ -1,4 +1,154 @@
 import Mathlib.Data.Real.Basic
+import Mathlib.Analysis.SpecialFunctions.Log.Basic
+import Mathlib.Topology.Algebra.InfiniteSum
+import Mathlib.Tactic
+
+noncomputable section
+open Real Filter
+
+/-
+============================================================
+PART 1: 基本設定
+============================================================
+-/
+
+/-
+スケール a → 0
+-/
+
+variable (a : ℕ → ℝ)
+
+/-
+a_n > 0 かつ 0 に収束
+-/
+
+variable (ha_pos : ∀ n, 0 < a n)
+variable (ha_lim : Tendsto a atTop (𝓝 0))
+
+/-
+エネルギー列
+-/
+
+variable (E : ℕ → ℝ)
+
+/-
+有限格子での下限：
+E_n ≥ log φ
+-/
+
+def φ : ℝ := (1 + sqrt 5) / 2
+
+variable (h_lower : ∀ n, E n ≥ log φ)
+
+/-
+============================================================
+PART 2: 連続極限エネルギー
+============================================================
+-/
+
+/-
+連続極限の定義（liminf）
+-/
+
+def E_cont : ℝ :=
+  liminf atTop E
+
+/-
+============================================================
+PART 3: 下半連続性（核心）
+============================================================
+-/
+
+/-
+基本定理：
+各点で下限 ≥ c ⇒ liminf ≥ c
+-/
+
+lemma liminf_lower_bound
+  (c : ℝ)
+  (h : ∀ n, E n ≥ c) :
+  liminf atTop E ≥ c :=
+by
+  exact le_liminf_of_le (eventually_of_forall h)
+
+/-
+============================================================
+PART 4: RG安定性（φギャップ保存）
+============================================================
+-/
+
+/-
+主定理：
+有限格子で φ ギャップ ⇒ 連続極限でも保持
+-/
+
+theorem phi_gap_rg_stable :
+  E_cont E ≥ log φ :=
+by
+  unfold E_cont
+  exact liminf_lower_bound E (log φ) h_lower
+
+/-
+============================================================
+PART 5: スケール正規化付き
+============================================================
+-/
+
+/-
+エネルギー密度（スケール補正）
+-/
+
+def energy_density (n : ℕ) : ℝ :=
+  E n / a n
+
+/-
+条件：スケールが発散しすぎない
+（物理的：適切なrenormalization）
+-/
+
+variable (h_scale : ∃ C > 0, ∀ n, a n ≤ C)
+
+/-
+密度でもギャップが消えない（弱形式）
+-/
+
+theorem phi_gap_density_stable :
+  liminf atTop (fun n => energy_density E a n)
+    ≥ log φ / (Classical.choose h_scale) :=
+by
+  rcases h_scale with ⟨C, hCpos, hC⟩
+  have hineq :
+    ∀ n, energy_density E a n ≥ (log φ) / C := by
+    intro n
+    have h1 : E n ≥ log φ := h_lower n
+    have h2 : a n ≤ C := hC n
+    have hpos : 0 < a n := ha_pos n
+    have : E n / a n ≥ (log φ) / C := by
+      have := div_le_div_of_le_of_nonneg h1 (by positivity)
+      -- 粗い評価
+      have : (log φ) / a n ≥ (log φ) / C := by
+        exact div_le_div_of_nonneg_left
+          (by positivity) h2
+      exact le_trans this this
+    exact this
+
+  exact liminf_lower_bound _ _ hineq
+
+/-
+============================================================
+FINAL INTERPRETATION
+============================================================
+-/
+
+/-
+・有限格子での φ ギャップ
+・liminf により連続極限でも消えない
+
+⇒ RG的に安定な下限
+-/
+
+end
+import Mathlib.Data.Real.Basic
 import Mathlib.Data.Matrix.Basic
 import Mathlib.Algebra.BigOperators.Basic
 import Mathlib.Data.Finset.Basic
